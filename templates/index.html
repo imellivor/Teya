@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тейя 🖤</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <div id="chatsScreen" class="screen">
+            <header class="header">
+                <div class="logo">
+                    <span class="logo-icon">🖤</span>
+                    <h1>Тейя</h1>
+                </div>
+                <button class="new-chat-btn" id="newChatBtn">+</button>
+            </header>
+            <main class="chats-list" id="chatsList"></main>
+        </div>
+
+        <div id="chatScreen" class="screen" style="display: none;">
+            <header class="header">
+                <button class="back-btn" id="backToChatsBtn">←</button>
+                <div class="chat-title" id="chatTitle">Новый мир</div>
+                <button class="settings-btn" id="settingsBtn">⚙️</button>
+            </header>
+            <main class="chat-container" id="chatContainer"></main>
+
+            <!-- Кнопка прокрутки вниз -->
+            <button class="scroll-down-btn" id="scrollDownBtn" style="display: none;">👇</button>
+
+            <footer class="input-panel">
+                <div class="input-wrapper">
+                    <textarea id="messageInput" placeholder="Напиши действие Джесс..." rows="1" disabled></textarea>
+                    <div class="button-group">
+                        <button class="stop-btn" id="stopBtn" disabled>⏹️</button>
+                        <button class="send-btn" id="sendBtn" disabled>📤</button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="newChatModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🖤 Новый мир</h2>
+                <button class="close-modal" id="closeNewChatModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <label for="newStoryRequest">Запрос на историю:</label>
+                <textarea id="newStoryRequest" rows="8" placeholder="Опиши мир, возраст Джесс, стартовую сцену..."></textarea>
+                <button class="save-prompt-btn" id="createChatBtn">🚀 Создать мир</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="settingsModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📜 Запрос этого мира</h2>
+                <button class="close-modal" id="closeSettingsBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="storyRequestView" rows="8" readonly></textarea>
+                <p style="color: #ff4d6d;">✏️ Запрос нельзя изменить</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
