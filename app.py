@@ -10,10 +10,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# СОЗДАЁМ БАЗУ ПРЯМО СЕЙЧАС
-with app.app_context():
-    init_db()
-
 # =====================================
 # НАСТРОЙКИ
 # =====================================
@@ -116,7 +112,7 @@ def load_system_prompt():
         return "Ты — Ведущая. Веди историю."
 
 # =====================================
-# ЗАПРОС К DEEPSEEK (БЕЗ СТРИМА)
+# ЗАПРОС К DEEPSEEK
 # =====================================
 def ask_deepseek(chat_id, user_message):
     messages = get_chat_messages(chat_id)
@@ -202,10 +198,13 @@ def api_delete_chat(chat_id):
     delete_chat(chat_id)
     return jsonify({'status': 'ok'})
 
+# =====================================
+# ЗАПУСК
+# =====================================
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)
 else:
-    # Это для Render — создаём базу при запуске
+    # Для Render — создаём базу при импорте
     with app.app_context():
         init_db()
