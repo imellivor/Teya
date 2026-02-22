@@ -204,5 +204,8 @@ def api_delete_chat(chat_id):
 
 if __name__ == '__main__':
     init_db()
-
     app.run(debug=True)
+else:
+    # Это для Render — создаём базу при запуске
+    with app.app_context():
+        init_db()
