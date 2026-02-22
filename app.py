@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 import json
 import requests
 from datetime import datetime
@@ -15,89 +16,106 @@ app = Flask(__name__)
 # =====================================
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+DATABASE_URL = os.getenv('DATABASE_URL')
 
 # =====================================
-# БАЗА ДАННЫХ
+# ПОДКЛЮЧЕНИЕ К POSTGRESQL
 # =====================================
+def get_db():
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return conn
+
 def init_db():
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
+    
+    # Таблица чатов
     c.execute('''CREATE TABLE IF NOT EXISTS chats
                  (id TEXT PRIMARY KEY,
                   title TEXT,
                   request TEXT,
                   last_updated TEXT)''')
+    
+    # Таблица сообщений
     c.execute('''CREATE TABLE IF NOT EXISTS messages
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 (id SERIAL PRIMARY KEY,
                   chat_id TEXT,
                   sender TEXT,
                   content TEXT,
                   is_dice_result INTEGER DEFAULT 0,
                   timestamp TEXT,
                   FOREIGN KEY (chat_id) REFERENCES chats (id))''')
+    
     conn.commit()
     conn.close()
 
+# =====================================
+# РАБОТА С БАЗОЙ
+# =====================================
 def get_chats():
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
     c.execute("SELECT id, title, request, last_updated FROM chats ORDER BY last_updated DESC")
     chats = c.fetchall()
+    
     result = []
     for chat in chats:
-        c.execute("SELECT COUNT(*) FROM messages WHERE chat_id = ?", (chat[0],))
-        msg_count = c.fetchone()[0]
-        c.execute("SELECT content FROM messages WHERE chat_id = ? ORDER BY timestamp DESC LIMIT 1", (chat[0],))
+        c.execute("SELECT COUNT(*) FROM messages WHERE chat_id = %s", (chat['id'],))
+        msg_count = c.fetchone()['count']
+        
+        c.execute("SELECT content FROM messages WHERE chat_id = %s ORDER BY timestamp DESC LIMIT 1", (chat['id'],))
         last_msg = c.fetchone()
+        
         result.append({
-            'id': chat[0],
-            'title': chat[1],
-            'request': chat[2],
-            'lastUpdated': chat[3],
+            'id': chat['id'],
+            'title': chat['title'],
+            'request': chat['request'],
+            'lastUpdated': chat['last_updated'],
             'messagesCount': msg_count,
-            'lastMessage': last_msg[0] if last_msg else None
+            'lastMessage': last_msg['content'] if last_msg else None
         })
+    
     conn.close()
     return result
 
 def get_chat_messages(chat_id):
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT sender, content, is_dice_result, timestamp FROM messages WHERE chat_id = ? ORDER BY timestamp ASC", (chat_id,))
+    c.execute("SELECT sender, content, is_dice_result, timestamp FROM messages WHERE chat_id = %s ORDER BY timestamp ASC", (chat_id,))
     messages = c.fetchall()
-    result = [{
-        'sender': msg[0],
-        'content': msg[1],
-        'isDiceResult': bool(msg[2]),
-        'timestamp': msg[3]
-    } for msg in messages]
     conn.close()
-    return result
+    
+    return [{
+        'sender': msg['sender'],
+        'content': msg['content'],
+        'isDiceResult': bool(msg['is_dice_result']),
+        'timestamp': msg['timestamp']
+    } for msg in messages]
 
 def create_new_chat(chat_id, title, request_text):
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
     now = datetime.now().isoformat()
-    c.execute("INSERT INTO chats (id, title, request, last_updated) VALUES (?, ?, ?, ?)",
+    c.execute("INSERT INTO chats (id, title, request, last_updated) VALUES (%s, %s, %s, %s)",
               (chat_id, title, request_text, now))
     conn.commit()
     conn.close()
 
 def save_message(chat_id, sender, content, is_dice_result=False):
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
     now = datetime.now().isoformat()
-    c.execute("INSERT INTO messages (chat_id, sender, content, is_dice_result, timestamp) VALUES (?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO messages (chat_id, sender, content, is_dice_result, timestamp) VALUES (%s, %s, %s, %s, %s)",
               (chat_id, sender, content, 1 if is_dice_result else 0, now))
-    c.execute("UPDATE chats SET last_updated = ? WHERE id = ?", (now, chat_id))
+    c.execute("UPDATE chats SET last_updated = %s WHERE id = %s", (now, chat_id))
     conn.commit()
     conn.close()
 
 def delete_chat(chat_id):
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-    c.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+    c.execute("DELETE FROM messages WHERE chat_id = %s", (chat_id,))
+    c.execute("DELETE FROM chats WHERE id = %s", (chat_id,))
     conn.commit()
     conn.close()
 
@@ -117,10 +135,10 @@ def load_system_prompt():
 def ask_deepseek(chat_id, user_message):
     messages = get_chat_messages(chat_id)
     
-    conn = sqlite3.connect('database.db')
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT request FROM chats WHERE id = ?", (chat_id,))
-    story_request = c.fetchone()[0]
+    c.execute("SELECT request FROM chats WHERE id = %s", (chat_id,))
+    story_request = c.fetchone()['request']
     conn.close()
     
     base_prompt = load_system_prompt()
@@ -198,13 +216,6 @@ def api_delete_chat(chat_id):
     delete_chat(chat_id)
     return jsonify({'status': 'ok'})
 
-# =====================================
-# ЗАПУСК
-# =====================================
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)
-else:
-    # Для Render — создаём базу при импорте
-    with app.app_context():
-        init_db()
