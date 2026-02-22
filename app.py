@@ -29,14 +29,12 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     
-    # Таблица чатов
     c.execute('''CREATE TABLE IF NOT EXISTS chats
                  (id TEXT PRIMARY KEY,
                   title TEXT,
                   request TEXT,
                   last_updated TEXT)''')
     
-    # Таблица сообщений
     c.execute('''CREATE TABLE IF NOT EXISTS messages
                  (id SERIAL PRIMARY KEY,
                   chat_id TEXT,
@@ -48,6 +46,13 @@ def init_db():
     
     conn.commit()
     conn.close()
+
+# =====================================
+# ПРОВЕРКА БАЗЫ ПЕРЕД КАЖДЫМ ЗАПРОСОМ
+# =====================================
+@app.before_request
+def before_request():
+    init_db()
 
 # =====================================
 # РАБОТА С БАЗОЙ
